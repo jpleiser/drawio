@@ -4,7 +4,7 @@ var GOOGLE_APPS_MAX_AREA = 25000000;
 var GOOGLE_SHEET_MAX_AREA = 1048576; //1024x1024
 
 //TODO Add support for loading math from a local folder
-Editor.initMath((remoteMath? 'https://app.diagrams.net/' : '') + 'math/MathJax.js');
+Editor.initMath((remoteMath? 'https://app.diagrams.net/' : '') + 'math/es5/startup.js');
 
 function render(data)
 {
@@ -16,7 +16,7 @@ function render(data)
 		data.scale = 1;
 	}
 	
-	document.body.innerHTML = '';
+	document.body.innerText = '';
 	var container = document.createElement('div');
 	container.id = 'graph';
 	container.style.width = '100%';
@@ -83,9 +83,7 @@ function render(data)
 		//Electron pdf export
 		try 
 		{
-			const { ipcRenderer } = require('electron');
-			
-			ipcRenderer.send('render-finished', null);
+			electron.sendMessage('render-finished', null);
 		}
 		catch(e)
 		{
@@ -96,28 +94,32 @@ function render(data)
 	}
 	
 	var xmlDoc = node.ownerDocument;
+	var origXmlDoc = xmlDoc;
 	var diagrams = null;
 	var from = 0;
 
+	function getFileXml(uncompressed)
+	{
+		var xml = mxUtils.getXml(origXmlDoc);
+		EditorUi.prototype.createUi = function(){};
+		EditorUi.prototype.addTrees = function(){};
+		EditorUi.prototype.updateActionStates = function(){};
+		var editorUi = new EditorUi();
+		var tmpFile = new LocalFile(editorUi, xml);
+		editorUi.setCurrentFile(tmpFile);
+		editorUi.setFileData(xml);
+		return editorUi.createFileData(editorUi.getXmlFileData(null, null, uncompressed));
+	};
+
 	if (mxIsElectron && data.format == 'xml')
 	{
-		const { ipcRenderer } = require('electron');
-
 		try
 		{
-			var xml = mxUtils.getXml(xmlDoc);
-			EditorUi.prototype.createUi = function(){};
-			EditorUi.prototype.addTrees = function(){};
-			EditorUi.prototype.updateActionStates = function(){};
-			var editorUi = new EditorUi();
-			var tmpFile = new LocalFile(editorUi, xml);
-			editorUi.setCurrentFile(tmpFile);
-			editorUi.setFileData(xml);
-			ipcRenderer.send('xml-data', mxUtils.getXml(editorUi.getXmlFileData(null, null, data.uncompressed)));
+			electron.sendMessage('xml-data', getFileXml(data.uncompressed));
 		}
 		catch(e)
 		{
-			ipcRenderer.send('xml-data-error');
+			electron.sendMessage('xml-data-error');
 		}
 		
 		return;
@@ -210,9 +212,7 @@ function render(data)
 				{
 					try 
 					{
-						const { ipcRenderer } = require('electron');
-						
-						ipcRenderer.on('get-svg-data', (event, arg) => 
+						electron.registerMsgListener('get-svg-data', (arg) => 
 						{
 							graph.mathEnabled = math; //Enable math such that getSvg works as expected
 							// Returns the exported SVG for the given graph (see EditorUi.exportSvg)
@@ -238,13 +238,33 @@ function render(data)
 							{
 								Editor.prototype.addMathCss(svgRoot);
 							}
-							
-							ipcRenderer.send('svg-data', '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n' +
-									mxUtils.getXml(svgRoot));
+						
+							function doSend() 
+							{
+								var editable = data.embedXml == '1';
+
+								if (editable)
+								{
+									svgRoot.setAttribute('content', getFileXml());
+								}
+
+								electron.sendMessage('svg-data', Graph.xmlDeclaration + '\n' + ((editable) ? Graph.svgFileComment + '\n' : '') +
+															 Graph.svgDoctype + '\n' + mxUtils.getXml(svgRoot));
+							};
+
+							if (data.embedImages == '1')
+							{
+								var tmpEditor = new Editor();
+								tmpEditor.convertImages(svgRoot, doSend);
+							}
+							else
+							{
+								doSend();
+							}
 						});
 						
 						//For some reason, Electron 9 doesn't send this object as is without stringifying. Usually when variable is external to function own scope
-						ipcRenderer.send('render-finished', {bounds: JSON.stringify(bounds), pageCount: pageCount});
+						electron.sendMessage('render-finished', {bounds: JSON.stringify(bounds), pageCount: pageCount});
 					}
 					catch(e)
 					{
@@ -279,24 +299,16 @@ function render(data)
 		}
 	};
 	
-	// Waits for MathJax.Hub to become available to register
-	// wait counter callback asynchronously after math render
-	var editorDoMathJaxRender = Editor.doMathJaxRender;
+	// Waits for MathJax autoloading and rendering
+	var editorOnMathJaxDone = Editor.onMathJaxDone;
 	
-	Editor.doMathJaxRender = function(container)
+	Editor.onMathJaxDone = function()
 	{
-		editorDoMathJaxRender.apply(this, arguments);
-		
-		window.setTimeout(function()
-		{
-			window.MathJax.Hub.Queue(function ()
-			{
-				decrementWaitCounter();
-			});
-		}, 0);
+		editorOnMathJaxDone.apply(this, arguments);
+		decrementWaitCounter();
 	};
-	
-	// Adds async MathJax rendering task
+
+	// Adds MathJax rendering task
 	function renderMath(elt)
 	{
 		if (math && Editor.MathJaxRender != null)
@@ -469,7 +481,7 @@ function render(data)
 			}
 			
 			// Checks if export format supports transparent backgrounds
-			if (bg == null && data.format != 'gif' && data.format != 'png')
+			if (bg == null && data.format != 'gif' && data.format != 'png' && data.format != 'svg')
 			{
 				bg = '#ffffff';
 			}	
@@ -701,6 +713,14 @@ function render(data)
 		bounds = (graph.pdfPageVisible) ? graph.view.getBackgroundPageBounds() : graph.getGraphBounds();
 		bounds.width = Math.ceil(bounds.width + data.border) + 1; //The 1 extra pixels to prevent cutting the cells on the edges when crop is enabled
 		bounds.height = Math.ceil(bounds.height + data.border) + 1; //The 1 extra pixels to prevent starting a new page. TODO Not working in every case
+		
+		//Print to pdf fails for 1x1 pages
+		if (bounds.width <= 1 && bounds.height <= 1)
+		{
+			bounds.width = 2;
+			bounds.height = 2;
+		}
+
 		expScale = graph.view.scale || 1;
 		
 		// Converts the graph to a vertical sequence of pages for PDF export
@@ -780,6 +800,13 @@ function render(data)
 				bounds.add(new mxRectangle(
 					(t.x + bgImg.x) * s, (t.y + bgImg.y) * s,
 					bgImg.width * s, bgImg.height * s));
+
+				if (t.x < 0 || t.y < 0)
+				{
+					graph.view.setTranslate(t.x < 0? -bgImg.x * s : t.x, t.y < 0? -bgImg.y * s : t.y);
+					bounds.x = 0.5;
+					bounds.y = 0.5;
+				}
 			}
 
 			// Adds shadow
@@ -896,11 +923,17 @@ if (mxIsElectron)
 {
 	try 
 	{
-		const { ipcRenderer } = require('electron');
-		
-		ipcRenderer.on('render', (event, arg) => 
+		electron.registerMsgListener('render', (arg) => 
 		{
-			render(arg);
+			try
+			{
+				render(arg);
+			}
+			catch(e)
+			{
+				console.log(e);
+				electron.sendMessage('render-finished', null);
+			}
 		});
 	}
 	catch(e)

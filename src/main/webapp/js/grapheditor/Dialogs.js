@@ -12,6 +12,7 @@ var OpenDialog = function()
 	iframe.style.borderStyle = 'none';
 	iframe.style.borderWidth = '0px';
 	iframe.style.overflow = 'hidden';
+	iframe.style.maxWidth = '100%';
 	iframe.frameBorder = '0';
 	
 	var dx = 0;
@@ -101,6 +102,7 @@ var ColorDialog = function(editorUi, color, apply, cancelFn)
 		table.setAttribute('cellspacing', '0');
 		table.style.marginBottom = '20px';
 		table.style.cellSpacing = '0px';
+		table.style.marginLeft = '1px';
 		var tbody = document.createElement('tbody');
 		table.appendChild(tbody);
 
@@ -115,7 +117,7 @@ var ColorDialog = function(editorUi, color, apply, cancelFn)
 				(mxUtils.bind(this, function(clr)
 				{
 					var td = document.createElement('td');
-					td.style.border = '1px solid black';
+					td.style.border = '0px solid black';
 					td.style.padding = '0px';
 					td.style.width = '16px';
 					td.style.height = '16px';
@@ -124,14 +126,20 @@ var ColorDialog = function(editorUi, color, apply, cancelFn)
 					{
 						clr = defaultColor;
 					}
-					
-					if (clr == 'none')
+
+					if (clr != null)
 					{
-						td.style.background = 'url(\'' + Dialog.prototype.noColorImage + '\')';
-					}
-					else if (clr != null)
-					{
-						td.style.backgroundColor = '#' + clr;
+						td.style.borderWidth = '1px';
+
+						if (clr == 'none')
+						{
+							td.style.background = 'url(\'' + Dialog.prototype.noColorImage + '\')';
+						}
+						else
+						{
+							td.style.backgroundColor = '#' + clr;
+						}
+
 						var name = this.colorNames[clr.toUpperCase()];
 
 						if (name != null)
@@ -425,29 +433,47 @@ var AboutDialog = function(editorUi)
  * Constructs a new textarea dialog.
  */
 var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w, h,
-	addButtons, noHide, noWrap, applyTitle, helpLink, customButtons)
+	addButtons, noHide, noWrap, applyTitle, helpLink, customButtons, header)
 {
 	w = (w != null) ? w : 300;
 	h = (h != null) ? h : 120;
 	noHide = (noHide != null) ? noHide : false;
-	var row, td;
-	
-	var table = document.createElement('table');
-	var tbody = document.createElement('tbody');
-	
-	row = document.createElement('tr');
-	
-	td = document.createElement('td');
-	td.style.fontSize = '10pt';
-	td.style.width = '100px';
-	mxUtils.write(td, title);
-	
-	row.appendChild(td);
-	tbody.appendChild(row);
 
-	row = document.createElement('tr');
-	td = document.createElement('td');
+	var div = document.createElement('div');
+	div.style.position = 'absolute';
+	div.style.top = '20px';
+	div.style.bottom = '20px';
+	div.style.left = '20px';
+	div.style.right = '20px';
 
+	var top = document.createElement('div');
+
+	top.style.position = 'absolute';
+	top.style.left = '0px';
+	top.style.right = '0px';
+
+	var main = top.cloneNode(false);
+	var buttons = top.cloneNode(false);
+
+	top.style.top = '0px';
+	top.style.height = '20px';
+	main.style.top = '20px';
+	main.style.bottom = '64px';
+	buttons.style.bottom = '0px';
+	buttons.style.height = '60px';
+	buttons.style.textAlign = 'center';
+
+	mxUtils.write(top, title);
+
+	div.appendChild(top);
+	div.appendChild(main);
+	div.appendChild(buttons);
+
+	if (header != null)
+	{
+		top.appendChild(header);
+	}
+	
 	var nameInput = document.createElement('textarea');
 	
 	if (noWrap)
@@ -462,8 +488,13 @@ var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w
 	
 	mxUtils.write(nameInput, url || '');
 	nameInput.style.resize = 'none';
-	nameInput.style.width = w + 'px';
-	nameInput.style.height = h + 'px';
+	nameInput.style.outline = 'none';
+	nameInput.style.position = 'absolute';
+	nameInput.style.boxSizing = 'border-box';
+	nameInput.style.top = '0px';
+	nameInput.style.left = '0px';
+	nameInput.style.height = '100%';
+	nameInput.style.width = '100%';
 	
 	this.textarea = nameInput;
 
@@ -473,17 +504,8 @@ var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w
 		nameInput.scrollTop = 0;
 	};
 
-	td.appendChild(nameInput);
-	row.appendChild(td);
-	
-	tbody.appendChild(row);
+	main.appendChild(nameInput);
 
-	row = document.createElement('tr');
-	td = document.createElement('td');
-	td.style.paddingTop = '14px';
-	td.style.whiteSpace = 'nowrap';
-	td.setAttribute('align', 'right');
-	
 	if (helpLink != null)
 	{
 		var helpBtn = mxUtils.button(mxResources.get('help'), function()
@@ -492,7 +514,7 @@ var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w
 		});
 		helpBtn.className = 'geBtn';
 		
-		td.appendChild(helpBtn);
+		buttons.appendChild(helpBtn);
 	}
 	
 	if (customButtons != null)
@@ -513,7 +535,7 @@ var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w
 
 				customBtn.className = 'geBtn';
 				
-				td.appendChild(customBtn);
+				buttons.appendChild(customBtn);
 			})(customButtons[i][0], customButtons[i][1], customButtons[i][2]);
 		}
 	}
@@ -533,12 +555,12 @@ var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w
 	
 	if (editorUi.editor.cancelFirst)
 	{
-		td.appendChild(cancelBtn);
+		buttons.appendChild(cancelBtn);
 	}
 	
 	if (addButtons != null)
 	{
-		addButtons(td, nameInput);
+		addButtons(buttons, nameInput);
 	}
 	
 	if (fn != null)
@@ -555,7 +577,7 @@ var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w
 		
 		genericBtn.setAttribute('title', 'Ctrl+Enter');
 		genericBtn.className = 'geBtn gePrimaryBtn';
-		td.appendChild(genericBtn);
+		buttons.appendChild(genericBtn);
 
 		mxEvent.addListener(nameInput, 'keypress', function(e)
 		{
@@ -568,13 +590,10 @@ var TextareaDialog = function(editorUi, title, url, fn, cancelFn, cancelTitle, w
 	
 	if (!editorUi.editor.cancelFirst)
 	{
-		td.appendChild(cancelBtn);
+		buttons.appendChild(cancelBtn);
 	}
 
-	row.appendChild(td);
-	tbody.appendChild(row);
-	table.appendChild(tbody);
-	this.container = table;
+	this.container = div;
 };
 
 /**
@@ -826,11 +845,14 @@ var ExportDialog = function(editorUi)
 	mxUtils.write(jpgOption, mxResources.get('formatJpg'));
 	imageFormatSelect.appendChild(jpgOption);
 
-	var pdfOption = document.createElement('option');
-	pdfOption.setAttribute('value', 'pdf');
-	mxUtils.write(pdfOption, mxResources.get('formatPdf'));
-	imageFormatSelect.appendChild(pdfOption);
-	
+	if (!editorUi.printPdfExport)
+	{
+		var pdfOption = document.createElement('option');
+		pdfOption.setAttribute('value', 'pdf');
+		mxUtils.write(pdfOption, mxResources.get('formatPdf'));
+		imageFormatSelect.appendChild(pdfOption);
+	}
+
 	var svgOption = document.createElement('option');
 	svgOption.setAttribute('value', 'svg');
 	mxUtils.write(svgOption, mxResources.get('formatSvg'));
@@ -1481,7 +1503,8 @@ var EditDataDialog = function(ui, cell)
 
 	for (var i = 0; i < attrs.length; i++)
 	{
-		if ((isLayer || attrs[i].nodeName != 'label') && attrs[i].nodeName != 'placeholders')
+		if ((attrs[i].nodeName != 'label' || Graph.translateDiagram ||
+			isLayer) && attrs[i].nodeName != 'placeholders')
 		{
 			temp.push({name: attrs[i].nodeName, value: attrs[i].nodeValue});
 		}
@@ -1957,38 +1980,12 @@ var OutlineWindow = function(editorUi, x, y, w, h)
 	this.window.setClosable(true);
 	this.window.setVisible(true);
 	
-	this.window.setLocation = function(x, y)
-	{
-		var iw = window.innerWidth || document.body.clientWidth || document.documentElement.clientWidth;
-		var ih = window.innerHeight || document.body.clientHeight || document.documentElement.clientHeight;
-		
-		x = Math.max(0, Math.min(x, iw - this.table.clientWidth));
-		y = Math.max(0, Math.min(y, ih - this.table.clientHeight - ((urlParams['sketch'] == '1') ? 3 : 48)));
-
-		if (this.getX() != x || this.getY() != y)
-		{
-			mxWindow.prototype.setLocation.apply(this, arguments);
-		}
-	};
-	
-	var resizeListener = mxUtils.bind(this, function()
-	{
-		var x = this.window.getX();
-		var y = this.window.getY();
-		
-		this.window.setLocation(x, y);
-	});
-	
-	mxEvent.addListener(window, 'resize', resizeListener);
-	
 	var outline = editorUi.createOutline(this.window);
 
-	this.destroy = function()
+	editorUi.installResizeHandler(this, true, function()
 	{
-		mxEvent.removeListener(window, 'resize', resizeListener);
-		this.window.destroy();
 		outline.destroy();
-	}
+	});
 
 	this.window.addListener(mxEvent.SHOW, mxUtils.bind(this, function()
 	{
@@ -2012,9 +2009,7 @@ var OutlineWindow = function(editorUi, x, y, w, h)
 	}));
 
 	outline.init(div);
-
-	var zoomInAction = editorUi.actions.get('zoomIn');
-	var zoomOutAction = editorUi.actions.get('zoomOut');
+	
 	mxEvent.addMouseWheelListener(function(evt, up)
 	{
 		var outlineWheel = false;
@@ -2033,14 +2028,16 @@ var OutlineWindow = function(editorUi, x, y, w, h)
 
 		if (outlineWheel)
 		{
-			if (up)
+			var factor = graph.zoomFactor;
+
+			// Slower zoom for pinch gesture on trackpad
+			if (evt.deltaY != null && Math.round(evt.deltaY) != evt.deltaY)
 			{
-				zoomInAction.funct();
+				factor = 1 + (Math.abs(evt.deltaY) / 20) * (factor - 1);
 			}
-			else
-			{
-				zoomOutAction.funct();
-			}
+
+			graph.lazyZoom(up, null, null, factor);
+			mxEvent.consume(evt);
 		}
 	});
 };
@@ -2349,7 +2346,7 @@ var LayersWindow = function(editorUi, x, y, w, h)
 	function refresh()
 	{
 		layerCount = graph.model.getChildCount(graph.model.root)
-		listDiv.innerHTML = '';
+		listDiv.innerText = '';
 		layerDivs.clear();
 		
 		function addLayer(index, label, child, defaultParent)
@@ -2695,34 +2692,5 @@ var LayersWindow = function(editorUi, x, y, w, h)
 	
 	// Make refresh available via instance
 	this.refreshLayers = refresh;
-	
-	this.window.setLocation = function(x, y)
-	{
-		var iw = window.innerWidth || document.body.clientWidth || document.documentElement.clientWidth;
-		var ih = window.innerHeight || document.body.clientHeight || document.documentElement.clientHeight;
-		
-		x = Math.max(0, Math.min(x, iw - this.table.clientWidth));
-		y = Math.max(0, Math.min(y, ih - this.table.clientHeight - ((urlParams['sketch'] == '1') ? 3 : 48)));
-
-		if (this.getX() != x || this.getY() != y)
-		{
-			mxWindow.prototype.setLocation.apply(this, arguments);
-		}
-	};
-	
-	var resizeListener = mxUtils.bind(this, function()
-	{
-		var x = this.window.getX();
-		var y = this.window.getY();
-		
-		this.window.setLocation(x, y);
-	});
-	
-	mxEvent.addListener(window, 'resize', resizeListener);
-
-	this.destroy = function()
-	{
-		mxEvent.removeListener(window, 'resize', resizeListener);
-		this.window.destroy();
-	}
+	editorUi.installResizeHandler(this, true);
 };

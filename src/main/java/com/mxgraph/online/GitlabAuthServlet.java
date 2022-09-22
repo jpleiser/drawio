@@ -8,9 +8,9 @@ import java.io.IOException;
 @SuppressWarnings("serial")
 public class GitlabAuthServlet extends AbsAuthServlet
 {
-	public static String CLIENT_SECRET_FILE_PATH = "/WEB-INF/gitlab_client_secret";
-	public static String CLIENT_ID_FILE_PATH = "/WEB-INF/gitlab_client_id";
-	public static String AUTH_SERVICE_URL_FILE_PATH = "/WEB-INF/gitlab_auth_url";
+	public static String CLIENT_SECRET_FILE_PATH = "gitlab_client_secret";
+	public static String CLIENT_ID_FILE_PATH = "gitlab_client_id";
+	public static String AUTH_SERVICE_URL_FILE_PATH = "gitlab_auth_url";
 	
 	private static Config CONFIG = null;
 	
@@ -18,42 +18,16 @@ public class GitlabAuthServlet extends AbsAuthServlet
 	{
 		if (CONFIG == null)
 		{
-			String clientSerets, clientIds;
-			
-			try
-			{
-				clientSerets = Utils
-						.readInputStream(getServletContext()
-								.getResourceAsStream(CLIENT_SECRET_FILE_PATH))
-						.replaceAll("\n", "");
-			}
-			catch (IOException e)
-			{
-				throw new RuntimeException("Client secrets path invalid");
-			}
-
-			try
-			{
-				clientIds = Utils
-						.readInputStream(getServletContext()
-								.getResourceAsStream(CLIENT_ID_FILE_PATH))
-						.replaceAll("\n", "");
-			}
-			catch (IOException e)
-			{
-				throw new RuntimeException("Client IDs path invalid");
-			}
+			String clientSerets = SecretFacade.getSecret(CLIENT_SECRET_FILE_PATH, getServletContext()), 
+					clientIds = SecretFacade.getSecret(CLIENT_ID_FILE_PATH, getServletContext());
 			
 			CONFIG = new Config(clientIds, clientSerets);
 
 			try
 			{
-				CONFIG.AUTH_SERVICE_URL = Utils
-						.readInputStream(getServletContext()
-								.getResourceAsStream(AUTH_SERVICE_URL_FILE_PATH))
-						.replaceAll("\n", "");
+				CONFIG.AUTH_SERVICE_URL = SecretFacade.getSecret(AUTH_SERVICE_URL_FILE_PATH, getServletContext());
 			}
-			catch (IOException e)
+			catch (Exception e)
 			{
 				CONFIG.AUTH_SERVICE_URL = "https://gitlab.com/oauth/token";
 			}
@@ -63,7 +37,7 @@ public class GitlabAuthServlet extends AbsAuthServlet
 		
 		return CONFIG;
 	}
-	
+
 	public GitlabAuthServlet()
 	{
 		super();
